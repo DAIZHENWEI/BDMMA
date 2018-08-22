@@ -1,7 +1,7 @@
 ---
-title: "Bayesian DM regression for the meta-analysis of metagenomic compositional data"
+title: "Batch Effects Correction for Microbiome Data with Dirichlet-multinomial Regression"
 author: "DAI ZHENWEI"
-date: "October 18, 2017"
+date: "22 August, 2018"
 output: pdf_document
 ---
 
@@ -12,21 +12,25 @@ knitr::opts_chunk$set(fig.width=5, fig.height=4)
 
 ## 1. Introduction
 
-The package BDMMA includes functions to perform meta-analysis of the metagenomic compositional data and select taxa significantly associated with the covariates. Compared with alternative method, our method has the following assumptions:
+Metagenomic sequencing techniques enable quantitative analyses of the microbiome. However, combining the microbial data from these experiments is challenging due to the variations between experiments. The existing methods for correcting batch effects do not consider the interactions between variables---microbial taxa in microbial studies---and the overdispersion of the microbiome data. Therefore, they are not applicable to microbiome data.
+
+We develop a new method, Bayesian Dirichlet-multinomial regression meta-analysis (BDMMA), to simultaneously model the batch effects and detect the microbial taxa associated with phenotypes. BDMMA automatically models the dependence among microbial taxa and is robust to the high dimensionality of the microbiome and their association sparsity.
+
+The package BDMMA includes functions to perform meta-analysis of the metagenomic compositional data and select taxa significantly associated with the covariates. BDMMA is based on the following assumptions:
 
 1. Only a small proportion of taxa are significantly associated with the covariates. 
 2. The taxonomic read counts follows a Dirichlet-Multinomial (DM) distribution. 
 3. The batch effects are indepdent of the covariates' effects. 
-4. All the batches are known.
+4. The batch information for each sample is known.
 
-### Brief introduction about the model
-Suppose the taxonomic read counts of a sample $y_{ij}$ (the $j-th$ sample in $i-th$ batch) is sampled from a DM distribution parameterized by $\gamma_{ij}=(\gamma_{ij1},\gamma_{ij2},...,\gamma_{ijG})$,
-$$f_{DM}(y_{ij}|\gamma_{ij}) = \frac{\Gamma(\gamma_{ij+})\Gamma(y_{ij+}+1)}{\Gamma(y_{ij+}+\gamma_{ij+})} \times \prod\limits_{g=1}^{G} \frac{\Gamma(y_{ijg}+\gamma_{ijg})}{\Gamma(\gamma_{ijg})\Gamma(y_{ijg}+1)} $$
+### Brief introduction to the BDMMA
+Suppose the taxonomic read counts of a sample $y_{ij}$ (the $j-th$ sample in $i-th$ batch) follow a DM distribution parameterized by $\gamma_{ij}=(\gamma_{ij1},\gamma_{ij2},...,\gamma_{ijG})$,
+$$f_{DM}(y_{ij}|\gamma_{ij}) = \frac{\Gamma(\gamma_{ij+})\Gamma(y_{ij+}+1)}{\Gamma(y_{ij+}+\gamma_{ij+})} \times \prod\limits_{g=1}^{G} \frac{\Gamma(y_{ijg}+\gamma_{ijg})}{\Gamma(\gamma_{ijg})\Gamma(y_{ijg}+1)}, $$
 where $y_{ij+}=\sum_{g=1}^{G}\gamma_{ijg}$ and $G$ encodes the number of all the taxa included in the analysis. We model the parameter $\gamma_{ijg}$ with,
-$$\gamma_{ijg}=\alpha_g\times \textrm{exp}(Z_{ij}\nu_g + \sum\limits_{p=1}^{P} X_{ijp}\beta_{pg} + \delta_{ig})$$
-where $g$ means the $g-th$ taxon; $Z$ is the variable of interest;$X=(X_{ijp})_{N \times P}$ is the confounding variable matrix ($N$ is the total number of samples and $P$ is the number of confounding variables); $\boldsymbol\delta=(\delta_{ig})_{I \times G}$ is the batch effects matrix satisfying $\sum_{i=1}^{I}n_i\delta_{ig}=0$ ($n_i$ is the sample size of $i-th$ batch). $\alpha_g$ and $\beta_{pg}$ encode the intercept and covariate coefficient respectively. 
+$$\gamma_{ijg}=\alpha_g\times \textrm{exp}(\sum\limits_{p=1}^{P} X_{ijp}\beta_{pg} + \delta_{ig}),$$
+where $g$ means the $g-th$ taxon; $X=(X_{ijp})_{N \times P}$ is the covariate matrix ($N$ is the total number of samples and $P$ is the number of covariate variables); $\boldsymbol\delta=(\delta_{ig})_{I \times G}$ is the batch effects matrix satisfying $\sum_{i=1}^{I}n_i\delta_{ig}=0$ ($n_i$ is the sample size of $i-th$ batch). $\alpha_g$ and $\beta_{pg}$ encode the intercept and covariate coefficient respectively. 
 
-We follow thw Bayesian approach and provide proper prior distributions for the parameters. To select the taxa significantly correlated with the variable of interest, we pose a spike-and-slab prior on the corresponding coefficients and estimate their posterior inclusion probability (PIP). The following variable selection process is performed through finding a suitable cutoff for PIP. In the next section, we provide an example to show the usage of functions in our package. 
+We adopt the Bayesian approach and provide proper prior distributions for the parameters. To select the taxa significantly associated with the variable of interest, we impose a spike-and-slab prior on the corresponding coefficients and estimate their posterior inclusion probability (PIP). The variable selection is conducted by thresholding PIP. In the next section, we provide an example to show the usage of functions in our package. 
 
 
 ## 2. Analysis Example
@@ -41,7 +45,7 @@ attributes(dat)
 ```
 
 
-`BDMMA` provides a function to visualize the differences of the taxonomic composition across cohorts with the principal coordinate analysis. `VBatch` plots the first two principal coordinates of the corresponding samples and also labels the 80% confidence ellipse of each batch. 
+`BDMMA` provides a function to visualize the differences of the taxonomic composition across cohorts with the principal coordinate analysis. `VBatch` plots the first two principal coordinates of the corresponding samples and the 80% confidence ellipse of each batch. 
 
 ```{r, echo=TRUE}
 figure = VBatch(dat$Y, batch = dat$batch, method = "bray")
@@ -61,15 +65,17 @@ print(figure[[1]])
 print(figure[[2]])
 ```
 
-Then, the main function `BDMMA` can work directly on `dat`. `BDMMA` provides the freedom to ignore the low abundant taxa and set the length for Markov chain. In the example, the length of burn in and sampling period is set to 2000.
+Then, the main function `BDMMA` can work directly on `dat`. `BDMMA` provides the freedom to ignore the low abundant taxa. `BDMMA` runs a Markov chain Monte Carlo algorithm to sample from the posterior distribution. The users can set the lengths of the burn-period and the sampling period for the Markov chain. In this example, the lengths of burn in and sampling period are set to 4000. 
 
 ```{r, echo=TRUE}
 output <- BDMMA(dat$X, dat$Y, dat$batch, dat$continuous, burn_in = 4000, sample_period = 4000)
 print(output$selected.taxa)
 head(output$parameter_summary)
+print(output$PIP)
+print(output$bFDR)
 ```
 
-The output includes three arguments, selected.taxa, parameter_summary and trace. The selected taxa with median inclusion model (cut PIP larger than 0.5) and controling Bayesian false discovery rate are listed in `output$selected.taxa`. The default bFDR level is set to 0.1 in the function. `BDMMA` selects `V10` and `V30` as significantly associated taxa. Users can check the mean and quantiles of parameters' posterior distribution in `output$parameter_summary`. `output$trace` includes the trace of the parameters and the function `trace_plot` can be used to check the convergence of the markov chain.
+The output includes three arguments, selected.taxa, parameter_summary and trace. The selected taxa with median inclusion model (cut PIP larger than 0.5) and controling Bayesian false discovery rate are listed in `output$selected.taxa`. The default bFDR level is set to 0.1 in the function. `BDMMA` selects `V10` and `V30` as significantly associated taxa. Users can check the mean and quantiles of parameters' posterior distribution in `output$parameter_summary`. `output$PIP` shows the PIPs of the selected taxa. Given the selected microbial taxa, `output$bFDR` provides the corresponding bFDR. `output$trace` includes the trace of the parameters and the function `trace_plot` can be used to check the convergence of the markov chain.
 ```{r, include=FALSE}
 knitr::opts_chunk$set(fig.width=6, fig.height=2.5) 
 ```

@@ -8,6 +8,7 @@
 #' @param burn_in The length of burn in period before sampling the parameters (default value = 5,000).
 #' @param sample_period The length of sampling period for estimating parameters' distribution (default value = 5,000)
 #' @param bFDR The false discovery rate level to control (default value = 0.1).
+#' @param PIPcut The threshold to cut the posterior inclusion probabilities (PIPs). By default, PIP is thresholding at 0.5.
 #' @return A list contains the selected taxa and summary of parameters included in the model.
 #' \item{selected.taxa}{A list includes the selected taxa fesatures that are significantly associated
 #' with the main effect variable.}
@@ -17,6 +18,8 @@
 #' the g-th taxon and j-th input variables; deltai_g: the batch effect parameter of batch i, taxon g;
 #' L_g: the posterior selection probability of g-th taxon; p: the proportion of significantly associated
 #' taxa; eta: the standard deviation of the spike distribution (in the spike-and-slab prior).}
+#' \item{PIP}{A vector contains the PIPs of selected microbial taxa.}
+#' \item{bFDR}{The corresponding bFDR under the selected microbial taxa.}
 #' @docType data
 #' @examples
 #' data(dat)
@@ -28,7 +31,7 @@
 #' @export
 
 BDMMA=function(X, Y, batch, continuous, abundance_threshold = 0.00005, burn_in = 5000,
-               sample_period = 5000, bFDR = 0.1){
+               sample_period = 5000, bFDR = 0.1, PIPcut = 0.5){
 
   batch = as.numeric(factor(batch))
 
@@ -150,7 +153,7 @@ BDMMA=function(X, Y, batch, continuous, abundance_threshold = 0.00005, burn_in =
   names(trace) = c(name1, name2, name3, "eta", "p", name4, name5)
 
   ## Select the significantly associated taxa
-  prediction_1 = (L_mean > 0.5) * 1
+  prediction_1 = (L_mean > PIPcut) * 1
   cutoff = fdr_cut(L_mean, alpha = bFDR)
   prediction_2 = (L_mean >= cutoff) * 1
   selected.taxa = list()
@@ -162,6 +165,9 @@ BDMMA=function(X, Y, batch, continuous, abundance_threshold = 0.00005, burn_in =
   output$trace = trace
   output$parameter_summary = parameter_summary
   output$selected.taxa = selected.taxa
+  output$PIP = L_mean[L_mean > PIPcut]
+  output$bFDR = 1 - mean(L_mean[L_mean >= cutoff])
+
 
   return(output)
 }

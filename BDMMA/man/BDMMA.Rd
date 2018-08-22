@@ -6,7 +6,7 @@
 \title{Bayesian Dirichlet--Multinomial approach for meta-analysis of metagenomic read counts}
 \usage{
 BDMMA(X, Y, batch, continuous, abundance_threshold = 5e-05, burn_in = 5000,
-  sample_period = 5000, bFDR = 0.1)
+  sample_period = 5000, bFDR = 0.1, PIPcut = 0.5)
 }
 \arguments{
 \item{X}{A data.frame for covariates, including main effect variable and confounding variables.
@@ -23,6 +23,8 @@ The first column represents the main effect variable.}
 \item{sample_period}{The length of sampling period for estimating parameters' distribution (default value = 5,000)}
 
 \item{bFDR}{The false discovery rate level to control (default value = 0.1).}
+
+\item{PIPcut}{The threshold to cut the posterior inclusion probabilities (PIPs). By default, PIP is thresholding at 0.5.}
 }
 \value{
 A list contains the selected taxa and summary of parameters included in the model.
@@ -34,6 +36,8 @@ labeled in the first row. alpha_g: the baseline intercept of g-th taxon; betaj_g
 the g-th taxon and j-th input variables; deltai_g: the batch effect parameter of batch i, taxon g;
 L_g: the posterior selection probability of g-th taxon; p: the proportion of significantly associated
 taxa; eta: the standard deviation of the spike distribution (in the spike-and-slab prior).}
+\item{PIP}{A vector contains the PIPs of selected microbial taxa.}
+\item{bFDR}{The resulting bFDR under the selected microbial taxa.}
 }
 \description{
 Bayesian Dirichlet--Multinomial approach for meta-analysis of metagenomic read counts
