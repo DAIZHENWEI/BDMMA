@@ -238,7 +238,7 @@ arma::mat MCMC(arma::rowvec alpha, arma::mat alpha_m, arma::mat x, arma::mat y,
     delta_m=delta_out.rows(I,N+I-1);
     delta_all.row(iteration-1)=arma::vectorise(delta).t();
 
-    if (iteration % 200 == 0){
+    if (iteration % 50 == 0){
       Rcout << "Iteration = " << iteration <<"\n";
     }
   }
