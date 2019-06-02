@@ -1,0 +1,125 @@
+---
+title: "Batch Effects Correction for Microbiome Data with Dirichlet-multinomial Regression"
+author: "DAI ZHENWEI"
+date: "23 Oct, 2018"
+output: pdf_document
+vignette: >
+  %\VignetteIndexEntry{BDMMAcorrect_user_guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=5, fig.height=4) 
+```
+
+## 1. Introduction
+
+Metagenomic sequencing techniques enable quantitative analyses of the microbiome. However, combining the microbial data from these experiments is challenging due to the variations between experiments. The existing methods for correcting batch effects do not consider the interactions between variables---microbial taxa in microbial studies---and the overdispersion of the microbiome data. Therefore, they are not applicable to microbiome data.
+
+We develop a new method, Bayesian Dirichlet-multinomial regression meta-analysis (BDMMA), to simultaneously model the batch effects and detect the microbial taxa associated with phenotypes. BDMMA automatically models the dependence among microbial taxa and is robust to the high dimensionality of the microbiome and their association sparsity.
+
+The package `BDMMAcorrect` includes functions to perform meta-analysis of the metagenomic compositional data and select taxa significantly associated with the covariates. BDMMA is based on the following assumptions:
+
+1. Only a small proportion of taxa are significantly associated with the covariates. 
+2. The taxonomic read counts follows a Dirichlet-Multinomial (DM) distribution. 
+3. The batch effects are indepdent of the covariates' effects. 
+4. The batch information for each sample is known.
+
+### Brief introduction to the BDMMA model
+Suppose the taxonomic read counts of a sample $y_{ij}$ (the $j-th$ sample in $i-th$ batch) follows a DM distribution parameterized by $\gamma_{ij}=(\gamma_{ij1},\gamma_{ij2},...,\gamma_{ijG})$,
+$$f_{DM}(y_{ij}|\gamma_{ij}) = \frac{\Gamma(\gamma_{ij+})\Gamma(y_{ij+}+1)}{\Gamma(y_{ij+}+\gamma_{ij+})} \times \prod\limits_{g=1}^{G} \frac{\Gamma(y_{ijg}+\gamma_{ijg})}{\Gamma(\gamma_{ijg})\Gamma(y_{ijg}+1)}, $$
+where $y_{ij+}=\sum_{g=1}^{G}\gamma_{ijg}$ and $G$ encodes the number of all the taxa included in the analysis. We model the parameter $\gamma_{ijg}$ with,
+$$\gamma_{ijg}=\alpha_g\times \textrm{exp}(\sum\limits_{p=1}^{P} X_{ijp}\beta_{pg} + \delta_{ig}),$$
+where $g$ means the $g-th$ taxon; $X=(X_{ijp})_{N \times P}$ is the covariate matrix ($N$ is the total number of samples and $P$ is the number of covariate variables); $\boldsymbol\delta=(\delta_{ig})_{I \times G}$ is the batch effects matrix satisfying $\sum_{i=1}^{I}n_i\delta_{ig}=0$ ($n_i$ is the sample size of the $i-th$ batch). $\alpha_g$ and $\beta_{pg}$ encode the intercept and covariate coefficient respectively. 
+
+We adopt the Bayesian approach and provide proper prior distributions for the parameters. To select the taxa significantly associated with the variable of interest, we impose a spike-and-slab prior on the corresponding coefficients and estimate their posterior inclusion probability (PIP). The variable selection is conducted by thresholding PIP. In the next section, we provide an example to show the usage of functions in our package. 
+
+
+## 2. Analysis Example
+
+We simulated a sample data set, named `Microbiome_dat`, including 80 samples and 40 taxa. The read counts were simulated from the DM distribution according to the BDMMA model assumptions. We also simulated a main effect variable  (case/control status) and a confounding variable. `Microbiome_dat` is a SummarizedExperiment object and be loaded directly.
+
+We use `colData` to retrieve the phenotype and batch information, and store them in `col_data`. Variable `main` is the main effect variable, `confounder` is the confounding variable and `batch` includes the batch labels of all the samples. The read counts can be accessed with `assay`, which will return a `matrix` object. 
+```{r results='hide', message=FALSE, warning=FALSE}
+library(BDMMAcorrect)
+require(SummarizedExperiment)
+data(Microbiome_dat)
+### Access phenotypes information 
+col_data <- colData(Microbiome_dat)
+pheno <- data.frame(col_data$main, col_data$confounder)
+batch <- col_data[,3]
+### Access taxonomy read counts 
+counts <- t(assay(Microbiome_dat))
+### Indicate whether the phenotype variables are continuous
+continuous <- mcols(col_data)[1:2,]
+```
+
+
+`BDMMAcorrect` provides a function to visualize the differences of the taxonomic composition across cohorts with the principal coordinate analysis. `VBatch` plots the first two principal coordinates of the corresponding samples and the 80% confidence ellipse of each batch. 
+
+```{r, echo=TRUE}
+figure = VBatch(Microbiome_dat = Microbiome_dat, method = "bray")
+print(figure)
+```
+
+For a case/control study, `VBatch` can also visualize the batch effect of the case and control samples respectively.
+```{r, echo=TRUE}
+main_variable <- pheno[,1]
+main_variable[main_variable == 0] <- "Control"
+main_variable[main_variable == 1] <- "Case"
+figure <- VBatch(Microbiome_dat = Microbiome_dat, main_variable = main_variable, method = "bray")
+print(figure[[1]])
+```
+
+```{r, echo=TRUE}
+print(figure[[2]])
+```
+
+Then, the main function `BDMMA` can work directly on `Microbiome_dat`. `BDMMAcorrect` provides the freedom to ignore the low abundant taxa. `BDMMAcorrect` runs a Markov chain Monte Carlo algorithm to sample from the posterior distribution. The users can set the lengths of the burn-in period and the sampling period for the Markov chain. In this example, the lengths of burn-in and sampling period are set to 4000. 
+
+```{r, echo=TRUE}
+output <- BDMMA(Microbiome_dat = Microbiome_dat, burn_in = 4000, sample_period = 4000)
+print(output$selected.taxa)
+head(output$parameter_summary)
+print(output$PIP)
+print(output$bFDR)
+```
+
+The output includes three arguments, selected.taxa, parameter_summary and trace. The selected taxa by thresholding PIPs and controling Bayesian false discovery rate are listed in `output$selected.taxa`. The default bFDR level and the PIP thresholds are set to 0.1 and 0.5 respectively in the function. `BDMMAcorrect` selects `V10` and `V30` as significantly associated taxa. Users can check the mean and quantiles of parameters' posterior distribution in `output$parameter_summary`. `output$PIP` shows the PIPs of the selected taxa. Given the selected microbial taxa, `output$bFDR` provides the corresponding bFDR. `output$trace` includes the trace of the parameters and the function `trace_plot` can be used to check the convergence of the Markov chain.
+```{r, include=FALSE}
+knitr::opts_chunk$set(fig.width=6, fig.height=2.5) 
+```
+
+```{r, echo=TRUE}
+figure <- trace_plot(trace = output$trace, param = c("alpha_1", "beta1_10"))
+print(figure)
+```
+
+## Prepare data for analysis 
+
+To prepare develop the data for the analysis, here, the following example shows how to pack the data into a `SummarizedExperiment` object that can be used as the input of the functions.
+
+```{r, echo=TRUE}
+### Simulate counts
+counts <- rmultinom(100,10000,rep(0.02,50))
+### Simulate covariates
+main <- rbinom(100,1,0.5)
+confounder <- rnorm(100,0,1)
+### Simulate batches
+batch <- c(rep(1,50),rep(2,50))
+
+library(SummarizedExperiment)
+col_data <- DataFrame(main, confounder, batch)
+mcols(col_data)$continous <- c(0L, 1L, 0L)
+### pack different datasets into a SummarizedExperiment object
+Microbiome_dat <- SummarizedExperiment(list(counts), colData=col_data)
+```
+
+
+
+
+
+
+
