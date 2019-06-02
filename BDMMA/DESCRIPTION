@@ -1,0 +1,18 @@
+Package: BDMMAcorrect
+Type: Package
+Title: Meta-analysis for the metagenomic read counts data from different cohorts
+Version: 1.1.2
+Author: ZHENWEI DAI <daizwhao@gmail.com>
+Maintainer: ZHENWEI DAI <daizwhao@gmail.com>
+Date: 2018-10-27
+Description: Metagenomic sequencing techniques enable quantitative analyses of the microbiome. However, combining the microbial data from these experiments is challenging due to the variations between experiments. The existing methods for correcting batch effects do not consider the interactions between variables—microbial taxa in microbial studies—and the overdispersion of the microbiome data. Therefore, they are not applicable to microbiome data. We develop a new method, Bayesian Dirichlet-multinomial regression meta-analysis (BDMMA), to simultaneously model the batch effects and detect the microbial taxa associated with phenotypes. BDMMA automatically models the dependence among microbial taxa and is robust to the high dimensionality of the microbiome and their association sparsity.
+License: GPL (>= 2)
+Depends: R (>= 3.5), vegan, ellipse, ggplot2, ape, SummarizedExperiment
+Encoding: UTF-8
+LazyData: true
+Imports: Rcpp (>= 0.12.12), RcppArmadillo, RcppEigen, stats
+LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+biocViews: ImmunoOncology, BatchEffect, Microbiome, Bayesian
+RoxygenNote: 6.0.1
+Suggests: knitr, rmarkdown, BiocGenerics
+VignetteBuilder: knitr
