@@ -1,0 +1,12 @@
+bibentry(bibtype = "Article",
+         title = "Batch effects correction for microbiome data with Dirichlet-multinomial regression",
+         author = c(person("Dai", "Zhenwei"),
+                    person("Wong", "Sunny H"),
+                    person("Yu", "Jun"),
+                    person("Wei", "Yingying")),
+         journal = "Bioinformatics",
+         year = 2019,
+         volumn = "35",
+         number = "5",
+         pages = "807–814",
+         )
